@@ -310,7 +310,7 @@ plt.show()
 
 theta = 30  # degrees
 
-sigma_global = np.array([0.002, 0.001, 0.0005])  # GPa
+sigma_global = sigma.copy()  # Same applied load as the global strain calculation
 
 T = transformation_matrix(theta)
 

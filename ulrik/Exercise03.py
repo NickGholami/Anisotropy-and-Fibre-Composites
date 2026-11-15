@@ -119,7 +119,7 @@ boundaries = np.concatenate(([0.0], bottom_positions))
 # Positive z points downwards
 z = boundaries - total_thickness / 2
 
-print("Ply boundary positions [mm]:", z)
+print(f"Ply boundary positions [mm]: \n {z}")
 
 # Initialize A, B, D matrices
 A = np.zeros((3, 3))
@@ -139,11 +139,78 @@ for i in range(len(angles)):
     B += Q_global * (z_bottom**2 - z_top**2) / 2
     D += Q_global * (z_bottom**3 - z_top**3) / 3
 
-print("A [N/mm]:")
-print(A)
+print(f"A [N/mm]: \n {A}")
 
-print("\nB [N]:")
-print(B)
+print(f"\nB [N]: \n {B}")
 
-print("\nD [N·mm]:")
-print(D)
+print(f"\nD [N·mm]: \n {D}")
+
+# %% Loads
+# Forces
+N = np.array([300.0, -50.0, 25.0])
+
+# Moments
+M = np.array([50.0, 0.0, 0.0])
+
+loads = np.concatenate((N, M))
+
+print(f"\nLoad vector [Nx, Ny, Nxy, Mx, My, Mxy]: \n {loads}")
+
+# %% Mid-plane strains and curvatures
+ABD = np.block([[A, B], [B, D]])
+strains_and_curvatures = np.linalg.solve(ABD, loads)
+
+epsilon_0 = strains_and_curvatures[:3]  # Mid-plane strains
+kappa = strains_and_curvatures[3:]     # Curvatures
+
+print(f"\nMid-plane strains: \n {epsilon_0}")
+print(f"Curvatures [1/mm]: \n {kappa}")
+
+# %% Local stresses at the top and bottom of each ply
+# Face 0 = top, face 1 = bottom, components = [sigma_1, sigma_2, tau_12].
+local_stresses = np.zeros((len(angles), 2, 3)) # number of plies, 2 faces, 3 stress components
+
+print(f"\nLocal stresses [MPa]:")
+print(f"{'Ply':>3} {'Face':>6} {'z [mm]':>9} {'sigma_1':>12} {'sigma_2':>12} {'tau_12':>12}")
+
+for i, angle in enumerate(angles):
+    T = transformation_matrix(angle)
+    Q_global = global_stiffness_matrix(Q_local, angle)
+
+    for face, z_face in enumerate((z[i], z[i + 1])):
+        # Global strain varies linearly through the thickness.
+        epsilon_global = epsilon_0 + z_face * kappa
+        sigma_global = Q_global @ epsilon_global
+
+        # Solve for the local stresses.
+        sigma_local = np.linalg.solve(T, sigma_global)
+        local_stresses[i, face] = sigma_local
+
+        face_name = "top" if face == 0 else "bottom"
+        print(f"{i + 1:3d} {face_name:>6} {z_face:9.2f} "
+              f"{sigma_local[0]:12.2f} {sigma_local[1]:12.2f} {sigma_local[2]:12.2f}")
+
+# %% Check: does doubling all loads double the stresses?
+loads_double = 2 * loads  # Double both N and M; keep the laminate unchanged.
+strains_and_curvatures_double = np.linalg.solve(ABD, loads_double)
+epsilon_0_double = strains_and_curvatures_double[:3]
+kappa_double = strains_and_curvatures_double[3:]
+
+local_stresses_double = np.zeros_like(local_stresses)
+
+for i, angle in enumerate(angles):
+    T = transformation_matrix(angle)
+    Q_global = global_stiffness_matrix(Q_local, angle)
+
+    for face, z_face in enumerate((z[i], z[i + 1])):
+        epsilon_global_double = epsilon_0_double + z_face * kappa_double
+        sigma_global_double = Q_global @ epsilon_global_double
+        local_stresses_double[i, face] = np.linalg.solve(T, sigma_global_double)
+
+# Compare all components at every face, allowing for floating-point round-off.
+stress_doubles = np.allclose(local_stresses_double, 2 * local_stresses,
+                            rtol=1e-10, atol=1e-8)
+max_difference = np.max(np.abs(local_stresses_double - 2 * local_stresses))
+
+print(f"\nDo all local stresses double? {stress_doubles}")
+print(f"Maximum difference from twice the original stress [MPa]: {max_difference:.3e}")
