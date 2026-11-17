@@ -1,6 +1,6 @@
-# %%
-import numpy as np
+"""Single ply - micromechanics, constitutive model and transformation."""
 
+import numpy as np
 
 def stiffness_parameters(v_f, E_f, E_m, nu_m, nu_f, xi_1=1, xi_2=1):
     # Volume fraction of matrix
@@ -44,7 +44,6 @@ def stiffness_parameters(v_f, E_f, E_m, nu_m, nu_f, xi_1=1, xi_2=1):
 
     return E1, E2_reuss, E2_ht, G12_reuss, G12_ht, nu12, nu23_reuss, nu23_ht
 
-
 def constitutive_matrix_3D(E1, E2, G12, nu12, nu23):
     E3 = E2
 
@@ -67,7 +66,6 @@ def constitutive_matrix_3D(E1, E2, G12, nu12, nu23):
 
     return S
 
-
 def constitutive_matrix_2D(E1, E2, G12, nu12):
     nu21 = nu12 * E2 / E1
 
@@ -79,77 +77,15 @@ def constitutive_matrix_2D(E1, E2, G12, nu12):
 
     return S
 
+def transformation_matrix(theta):
+    theta = np.deg2rad(theta)
+    c = np.cos(theta)
+    s = np.sin(theta)
 
-def inverted_constitutive_matrix(S):
-    return np.linalg.inv(S)
+    T = np.array([
+        [c**2, s**2, -2 * s * c],
+        [s**2, c**2, 2 * s * c],
+        [s * c, -s * c, c**2 - s**2]
+    ])
+    return T
 
-
-# Input — moduli in GPa
-Em = 4
-num = 0.30
-
-Ef = 76
-nuf = 0.20
-
-vf = 0.55
-
-xi1 = 1
-xi2 = 1
-
-
-# Stiffness parameters
-E1, E2_reuss, E2_ht, G12_reuss, G12_ht, nu12, nu23_reuss, nu23_ht = stiffness_parameters(
-    vf, Ef, Em, num, nuf, xi1, xi2
-)
-
-
-# Constitutive matrices — Reuss E2
-S_3D_reuss = constitutive_matrix_3D(
-    E1, E2_reuss, G12_reuss, nu12, nu23_reuss
-)
-
-S_2D_reuss = constitutive_matrix_2D(E1, E2_reuss, G12_reuss, nu12)
-
-Q_2D_reuss = inverted_constitutive_matrix(S_2D_reuss)
-
-
-# Constitutive matrices — Halpin-Tsai E2
-
-S_3D_ht = constitutive_matrix_3D(
-    E1, E2_ht, G12_ht, nu12, nu23_ht
-)
-
-S_2D_ht = constitutive_matrix_2D(E1, E2_ht, G12_ht, nu12)
-
-Q_2D_ht = inverted_constitutive_matrix(S_2D_ht)
-
-
-# Display results
-np.set_printoptions(precision=6, suppress=True)
-
-print("E1 =", E1, "GPa")
-print("E2 (Reuss) =", E2_reuss, "GPa")
-print("E2 (Halpin-Tsai) =", E2_ht, "GPa")
-print("G12 (Reuss) =", G12_reuss, "GPa")
-print("G12 (Halpin-Tsai) =", G12_ht, "GPa")
-print("nu12 =", nu12)
-print("nu23 (Reuss) =", nu23_reuss)
-print("nu23 (Halpin-Tsai) =", nu23_ht)
-
-print("\nS 3D — Reuss E2 (1/GPa):")
-print(S_3D_reuss)
-
-print("\nS 3D — Halpin-Tsai E2 (1/GPa):")
-print(S_3D_ht)
-
-print("\nS 2D — Reuss E2 (1/GPa):")
-print(S_2D_reuss)
-
-print("\nS 2D — Halpin-Tsai E2 (1/GPa):")
-print(S_2D_ht)
-
-print("\nQ 2D — Reuss E2 (GPa):")
-print(Q_2D_reuss)
-
-print("\nQ 2D — Halpin-Tsai E2 (GPa):")
-print(Q_2D_ht)
